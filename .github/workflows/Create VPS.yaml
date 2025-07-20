@@ -1,4 +1,4 @@
-name: Start Persistent Pinggy Tunnel
+name: Persistent Pinggy TCP SSH Tunnel
 
 on:
   workflow_dispatch:
@@ -7,27 +7,26 @@ jobs:
   tunnel:
     runs-on: ubuntu-latest
     steps:
-      - name: ✅ Install OpenSSH & Create User
+      - name: ✅ Install OpenSSH Server
         run: |
           sudo apt update -y
           sudo apt install -y openssh-server
           sudo useradd -m vpsuser
-          PASSWORD="$(openssl rand -base64 10)"
+          PASSWORD="$(openssl rand -base64 12)"
           echo "vpsuser:$PASSWORD" | sudo chpasswd
           echo "$PASSWORD" > ssh_password.txt
           sudo sed -i 's/Port 22/Port 2222/' /etc/ssh/sshd_config
           sudo systemctl restart ssh
 
-      - name: 🚀 Start persistent Pinggy tunnel (while true)
+      - name: 🚀 Start persistent TCP tunnel via Pinggy (while true)
         run: |
           sudo apt-get install -y openssh-client
           while true; do
             ssh -p 443 \
-              -R0:localhost:3000 \
-              -L4300:localhost:4300 \
+              -R0:localhost:2222 \
               -o StrictHostKeyChecking=no \
               -o ServerAliveInterval=30 \
-              bmfYULN6dqT@pro.pinggy.io
+              bmfYULN6dqT+tcp@ap.pro.pinggy.io
             echo "Tunnel disconnected. Reconnecting in 10 seconds..."
             sleep 10
           done &
@@ -41,7 +40,7 @@ jobs:
           echo "Username: $USER"
           echo "Password: $PASS"
           echo "Host: [lihat log tunnel]"
-          echo "Port: 3000 (reverse) / 4300 (local forward)"
+          echo "Port: 2222 (via pinggy TCP tunnel)"
 
       - name: ⏳ Keep VPS alive
         run: |
