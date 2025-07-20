@@ -1,18 +1,12 @@
-name: Create VPS with Direct SSH (Pinggy Persistent Subdomain)
+name: Start Persistent Pinggy Tunnel
 
 on:
   workflow_dispatch:
 
 jobs:
-  start-vps:
+  tunnel:
     runs-on: ubuntu-latest
     steps:
-      - name: ⬇️ Checkout
-        uses: actions/checkout@v3
-
-      - name: 📁 Prepare dirs
-        run: mkdir -p links .backup
-
       - name: ✅ Install OpenSSH & Create User
         run: |
           sudo apt update -y
@@ -20,35 +14,40 @@ jobs:
           sudo useradd -m vpsuser
           PASSWORD="$(openssl rand -base64 10)"
           echo "vpsuser:$PASSWORD" | sudo chpasswd
-          echo "$PASSWORD" > links/ssh_password.txt
+          echo "$PASSWORD" > ssh_password.txt
           sudo sed -i 's/Port 22/Port 2222/' /etc/ssh/sshd_config
           sudo systemctl restart ssh
 
-      - name: 🚀 Start pinggy Tunnel (Persistent Subdomain)
+      - name: 🚀 Start persistent Pinggy tunnel (while true)
         run: |
-          curl -fsSL https://pinggy.io/install.sh | bash
-          # Jalankan pinggy dengan subdomain dan token, port 2222
-          nohup pinggy tcp -a bmfYULN6dqT -s nsgcubuczg.a.pinggy.link 2222 > pinggy.log 2>&1 &
-          sleep 10   # tunggu tunnel aktif
+          sudo apt-get install -y openssh-client
+          while true; do
+            ssh -p 443 \
+              -R0:localhost:3000 \
+              -L4300:localhost:4300 \
+              -o StrictHostKeyChecking=no \
+              -o ServerAliveInterval=30 \
+              bmfYULN6dqT@pro.pinggy.io
+            echo "Tunnel disconnected. Reconnecting in 10 seconds..."
+            sleep 10
+          done &
+          sleep 15
 
-      - name: 📤 Output SSH Info (Persistent Subdomain)
+      - name: 📤 Output SSH Info
         run: |
           USER="vpsuser"
-          PASS=$(cat links/ssh_password.txt)
-          HOST="nsgcubuczg.a.pinggy.link"
-          PORT="2222"
-          echo "==== SSH LOGIN INFO ====" > links/ssh_info.txt
-          echo "Username: $USER" >> links/ssh_info.txt
-          echo "Password: $PASS" >> links/ssh_info.txt
-          echo "Host: $HOST" >> links/ssh_info.txt
-          echo "Port: $PORT" >> links/ssh_info.txt
-          cat links/ssh_info.txt
+          PASS=$(cat ssh_password.txt)
+          echo "==== SSH LOGIN INFO ===="
+          echo "Username: $USER"
+          echo "Password: $PASS"
+          echo "Host: [lihat log tunnel]"
+          echo "Port: 3000 (reverse) / 4300 (local forward)"
 
       - name: ⏳ Keep VPS alive
         run: |
           i=1
           while [ $i -le 360 ]; do
             echo "🟢 Running minute $i/360..."
-            command sleep 60 || break
+            sleep 60
             i=$((i+1))
           done
